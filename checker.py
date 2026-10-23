@@ -1236,7 +1236,8 @@ def diff_new_slots(all_results, prev):
 
 def run_specified_dates(target_dates):
     """指定日モードの本体：取得→整形→通知。"""
-    now = datetime.now().strftime("%Y/%m/%d %H:%M")
+    started = datetime.now()  # 巡回の開始時刻。生存確認の判定は終了時刻でなくこちらで行う
+    now = started.strftime("%Y/%m/%d %H:%M")
     print(f"=== 葛飾区施設チェック（指定日モード）{now} ===")
     print("対象日:", ", ".join(d.strftime("%Y/%m/%d(") + "月火水木金土日"[d.weekday()] + ")"
                               for d in target_dates), "\n")
@@ -1310,7 +1311,7 @@ def run_specified_dates(target_dates):
                   f"▶ 予約: {BASE_URL}/menu.jsp")
 
     # 本日の完走回数（生存確認メールに載せる）
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = started.strftime("%Y-%m-%d")
     runs = (prev or {}).get("runs", {})
     runs = {"date": today, "count": (runs.get("count", 0) if runs.get("date") == today else 0) + 1}
     meta = {"runs": runs, "heartbeat_sent": (prev or {}).get("heartbeat_sent", "")}
@@ -1318,7 +1319,7 @@ def run_specified_dates(target_dates):
     # 生存確認：23時の回だけ、1日1通「本日の巡回完了」を送る（2026-10-23）。
     # このメールが来ない日＝どこかで止まっている、と判断できるようにするため。
     heartbeat_ok = True
-    if datetime.now().hour == HEARTBEAT_HOUR and meta["heartbeat_sent"] != today:
+    if started.hour == HEARTBEAT_HOUR and meta["heartbeat_sent"] != today:
         heartbeat_ok = send_heartbeat(target_dates, all_results, failures, runs["count"])
         if heartbeat_ok:
             meta["heartbeat_sent"] = today
