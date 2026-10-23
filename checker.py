@@ -1319,13 +1319,18 @@ def run_specified_dates(target_dates):
     # 生存確認：23時の回だけ、1日1通「本日の巡回完了」を送る（2026-10-23）。
     # このメールが来ない日＝どこかで止まっている、と判断できるようにするため。
     heartbeat_ok = True
-    if started.hour == HEARTBEAT_HOUR and meta["heartbeat_sent"] != today:
+    if started.hour >= HEARTBEAT_HOUR and meta["heartbeat_sent"] != today:
         heartbeat_ok = send_heartbeat(target_dates, all_results, failures, runs["count"])
         if heartbeat_ok:
             meta["heartbeat_sent"] = today
 
-    if mail_ok:
+    all_failed = len(purpose_failed) >= len(TARGET_PURPOSES)
+    if mail_ok and not all_failed:
         save_state(all_results, failures, meta=meta)
+    elif all_failed:
+        # 全種目が取れなかった回で上書きすると、次の回に既存の空きが全部「新着」として届く（2026-10-24）
+        print("[状態] 全種目が取得できなかったため、空き枠は前回の状態のまま保存")
+        save_state(all_results, failures, prev=prev, keep_prev=True, meta=meta)
     else:
         # 通知できなかった枠を「通知済み」にしない。次回もう一度通知させる
         print("[状態] メール送信に失敗したため、空き枠は前回の状態のまま保存（次回に再通知）")
@@ -1336,8 +1341,9 @@ def run_specified_dates(target_dates):
         sys.exit(1)
 
 
-HEARTBEAT_HOUR = 23
-RUNS_PER_DAY = 17
+HEARTBEAT_HOUR = 22   # 22時台以降に始まった最初の回で送る（GitHubの起動遅れで23時台にずれても届く）
+RUNS_PER_DAY = 16     # 7〜22時の毎時
+MAINTENANCE_HOURS = range(0, 7)   # 区のシステムの保守時間（0〜7時）
 
 
 def send_heartbeat(target_dates, all_results, failures, run_count):
@@ -1483,6 +1489,11 @@ def launch_browser(p, attempts=3, timeout_ms=120_000):
 
 
 def main():
+    # GitHubの起動遅れで0時を過ぎてから始まると、保守中の区のサイトで全種目が失敗し
+    # 「チェック失敗」メールが届く（2026-10-24 0:07 に発生）。保守時間は何もせず終わる
+    if datetime.now().hour in MAINTENANCE_HOURS:
+        print("区のシステムの保守時間（0〜7時）のため実行しません")
+        return
     # 前回の異常終了で残ったブラウザを掃除する（放置すると launch が
     # タイムアウトし、無通知のまま失敗し続ける。2026-09-08）
     cleanup_orphan_browsers()
