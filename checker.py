@@ -1336,7 +1336,7 @@ def run_specified_dates(target_dates):
 
 
 HEARTBEAT_HOUR = 23
-RUNS_PER_DAY = 9
+RUNS_PER_DAY = 17
 
 
 def send_heartbeat(target_dates, all_results, failures, run_count):
