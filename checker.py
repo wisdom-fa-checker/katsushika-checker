@@ -981,6 +981,18 @@ def _calendar_switch_facility(page, code):
 
 
 def enter_day_screen(page, purpose_name, facilities, td, max_try=8):
+    """指定日の日別画面まで入る。戻り値: True/False
+    区のサイトの画面遷移が途中で崩れると例外が出て巡回全体が止まるため（2026-10-23 23:10 に発生）、
+    例外は1回だけやり直し、それでも駄目ならその日を「入れず」として次へ進む。"""
+    for attempt in range(2):
+        try:
+            return _enter_day_screen(page, purpose_name, facilities, td, max_try)
+        except Exception as e:
+            print(f"    [日別画面エラー] {purpose_name} {td}（{attempt + 1}回目）: {e}")
+    return False
+
+
+def _enter_day_screen(page, purpose_name, facilities, td, max_try=8):
     """指定日の日別画面まで入る。日リンクが立っている施設を順に試す。
     戻り値: True/False"""
     open_purpose_calendar(page, purpose_name)
