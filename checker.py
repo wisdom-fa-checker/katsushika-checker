@@ -44,7 +44,7 @@ AVAILABLE_STATUS = {"全て空き", "一部空き"}
 
 # 一時的に対象外にする施設（名前の部分一致）。
 # 陸上競技場 = 改修工事中で予約画面が特殊（2026-06）。工事完了後はこの行を削除して復活。
-EXCLUDE_FACILITIES = ["陸上競技場"]
+EXCLUDE_FACILITIES = ["陸上競技場", "奥戸総スポ"]   # 奥戸は使わない（2026-10-25 代表指示）
 
 # --- メール赤文字ルール（HTMLメール表示用。名前の部分一致で判定）---
 # 下記施設は「時間帯を問わず」赤文字にする
@@ -684,6 +684,11 @@ BOOKING_WINDOW_DAYS = 30
 # 9/28(月) は学校が休みで、17時以降の会場を押さえたい（2026-09-20 代表指示）。
 EXTRA_DATES = ["2026-09-28"]
 
+# 予定が決まっていて会場を探す必要がない日。'YYYY-MM-DD' 形式（2026-10-25 代表指示）。
+# 巡回は1日あたり約2〜3分かかるため、外すほど1回の巡回が短くなる。過去日は書き残しても害はない。
+SKIP_DATES = ["2026-10-31", "2026-11-01", "2026-11-08", "2026-11-15", "2026-11-21", "2026-11-22",
+              "2026-11-23", "2026-11-28", "2026-11-29", "2026-12-06", "2026-12-12", "2026-12-13"]
+
 # 毎週見る平日の曜日（0=月〜6=日）。土日祝は別枠で必ず入る。
 WEEKLY_WEEKDAYS = [3]           # 木曜
 
@@ -774,18 +779,18 @@ def auto_target_dates(window_days: int = BOOKING_WINDOW_DAYS, extra_dates=None):
     """
     today = date.today()
     last = today + timedelta(days=window_days)
-    picked = {today + timedelta(days=i)
-              for i in range(window_days + 1)
-              if (today + timedelta(days=i)).weekday() in (5, 6)
-              or jpholiday.is_holiday(today + timedelta(days=i))}
+    # 当日は見ない（2026-10-25 代表指示）。当日の枠は使わないうえ、夜は受付が閉じて
+    # 全施設が取得失敗になり、待ち時間で巡回が長引いていた
+    days = [today + timedelta(days=i) for i in range(1, window_days + 1)]
+    picked = {d for d in days if d.weekday() in (5, 6) or jpholiday.is_holiday(d)}
     # 毎週見る平日（既定＝木曜）を足す
-    picked |= {today + timedelta(days=i)
-               for i in range(window_days + 1)
-               if (today + timedelta(days=i)).weekday() in WEEKLY_WEEKDAYS}
+    picked |= {d for d in days if d.weekday() in WEEKLY_WEEKDAYS}
     # 土日祝でも木曜でもない単発の指定日を足す（窓の中のものだけ）
     for d in parse_extra_dates(EXTRA_DATES if extra_dates is None else extra_dates):
-        if today <= d <= last:
+        if today < d <= last:
             picked.add(d)
+    # 予定が決まっている日を外す
+    picked -= set(parse_extra_dates(SKIP_DATES))
     return sorted(picked)
 
 
